@@ -26,7 +26,7 @@ def normalize_service_name(name: str) -> str:
 def generate_service_response(name, link, query):
     name = normalize_service_name(name)
     service = PROGRAMS["services"].get(name, {})
-
+    link= service.get("link", [])
     description = service.get("description", "No description available.")
     sector = service.get("sector", "")
     required_documents = service.get("required_documents", {})
@@ -45,13 +45,16 @@ You are an AI that explains government services.
 Service Name: {name}
 User Query: {query}
 
-📘 Description:
+Description:
 {description}
+
+Official Link: {link if link else "No official link available"}
 """
 
     if sector:
         prompt += f"\nSector: {sector}"
-
+    if link:
+        prompt += f"\nLink: {link}"
     if required_documents:
         prompt += "\n\nRequired Documents:"
         for method, docs in required_documents.items():

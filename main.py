@@ -3,8 +3,8 @@ from pydantic import BaseModel
 from llm_router import classify_query
 from llm_initiative import generate_initiative_response
 from llm_service import generate_service_response
+from llm_counter import PROGRAMS, generate_count_response
 import requests
-from llm_counter import PROGRAMS  # import programs
 
 app = FastAPI()
 
@@ -22,23 +22,23 @@ user_context = {
     "last_query": None
 }
 
+
 @app.post("/search")
 async def search_handler(payload: QueryRequest):
     query = payload.query.strip().lower()
     session_id = "default"
 
+    # Resolve vague terms like "it" or "this"
     vague_terms = ["it", "this", "that", "they", "them", "their", "its", "they're"]
     if any(word in query for word in vague_terms) and user_context["last_name"]:
-        # Replace vague terms with last referred name
         for term in vague_terms:
             query = query.replace(term, user_context["last_name"].lower())
 
-    
+    # Greet the user
     if query in ["hi", "hello", "hey", "salam", "asalamualaikum"]:
         count_initiatives = len(PROGRAMS["initiatives"])
         count_services = len(PROGRAMS["services"])
         total = count_initiatives + count_services
-
         example_initiative = list(PROGRAMS["initiatives"].keys())[0]
         example_service = list(PROGRAMS["services"].keys())[0]
 
@@ -82,13 +82,13 @@ Use plain English. Be clear and friendly.
             "description": message
         }
 
-    # Classification
+    # Classify query
     intent_data = classify_query(query)
     intent = intent_data.get("intent", "unknown").lower()
     name = intent_data.get("name", "")
     link = intent_data.get("link", "")
 
-        # Save to context for future vague references
+    # Save for vague future reference
     if name and name != "summary":
         user_context["last_name"] = name
         user_context["last_intent"] = intent
@@ -105,13 +105,11 @@ Use plain English. Be clear and friendly.
         user_context["last_name"] = list(PROGRAMS["services"].keys())[0]
         user_context["last_link"] = PROGRAMS["services"][user_context["last_name"]]["link"]
 
-
-    # Program count response
+    # Program count intent
     if intent in ["count_services", "count_initiatives", "total_programs", "count_programs"]:
-        from llm_counter import generate_count_response
         return generate_count_response(intent, query)
 
-    #  Full listing
+    # List all
     elif intent in ["initiatives", "services"] and name == "summary":
         return {
             "intent": intent,
@@ -122,31 +120,58 @@ Use plain English. Be clear and friendly.
                            ", ".join(list(PROGRAMS[intent].keys())) + "."
         }
 
-    #  Individual response
+    # Specific initiative or service
     elif intent == "initiative":
-        result = generate_initiative_response(name, link, query)
+        return {
+            "intent": intent,
+            "name": name,
+            **generate_initiative_response(name, link, query)
+        }
 
     elif intent == "service":
-        result = generate_service_response(name, link, query)
-
-    #  General summary
-    elif intent == "summary":
-        result = {
-            "title": "Government Programs Summary",
-            "link": link,
-            "description": "The government is currently offering various services and initiatives. Please specify your query for more details."
+        return {
+            "intent": intent,
+            "name": name,
+            **generate_service_response(name, link, query)
         }
 
-    #  Unknown
-    else:
-        result = {
-            "title": "Unknown",
-            "link": "#",
-            "description": "Could not classify your query."
+    # Chitchat fallback
+    elif intent in ["summary", "unknown"] and query:
+        fallback_prompt = f"""
+You are a friendly AI assistant that helps citizens explore government services in Pakistan.
+
+However, the user asked something unrelated:
+
+User Query: "{query}"
+
+Respond in a warm, helpful, and human tone. If possible, gently guide them to ask about government services like birth certificates or apni zameen initiatives.
+Avoid robotic replies. Keep it short and friendly.
+"""
+        try:
+            res = requests.post(OLLAMA_URL, json={
+                "model": MODEL,
+                "prompt": fallback_prompt,
+                "stream": False
+            })
+            chat_response = res.json()["response"].strip()
+        except Exception:
+            chat_response = (
+                "I'm here to help you with government services like housing, CNICs, or certificates. "
+                "Try asking me about those!"
+            )
+
+        return {
+            "intent": "chitchat",
+            "name": "general",
+            "title": "Let's Chat",
+            "description": chat_response
         }
 
+    # Final fallback
     return {
         "intent": intent,
         "name": name,
-        **result
+        "title": "Unknown",
+        "link": "#",
+        "description": "Could not classify your query."
     }

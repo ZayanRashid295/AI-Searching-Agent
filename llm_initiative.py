@@ -10,6 +10,7 @@ def generate_initiative_response(name, link, query):
 
     program = PROGRAMS["initiatives"].get(name, {})
     description = program.get("description", "No description available.")
+    link = program.get("link", [])
     eligibility = program.get("eligibility", [])
     application_process = program.get("application_process", [])
     contact = program.get("contact", {})
@@ -24,7 +25,10 @@ User Query: {query}
 
 Description:
 {description}
+
+Official Link: {link if link else "No official link available"}
 """
+
 
     if eligibility:
         prompt += "\nEligibility:\n" + "\n".join(f"- {item}" for item in eligibility)
@@ -38,7 +42,8 @@ Description:
             prompt += f"- Helpline: {contact['helpline']}\n"
         if "phone" in contact:
             prompt += f"- Phone: {', '.join(contact['phone'])}\n"
-
+    if link:
+        prompt += "\nLinks:\n" + "\n".join(f"- {l}" for l in link)
     if scope:
         prompt += "\nDistricts Covered:\n" + ", ".join(scope)
 

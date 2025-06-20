@@ -11,13 +11,10 @@ The government currently offers:
 
 Initiatives:
 1. Apni Zameen Apna Ghar – Housing/Shelter
-2. Youth Empowerment Scheme – Skill training
-3. Digital Pakistan – Digital access
+
 
 Services:
 1. Birth Certificate – Legal identity
-2. CNIC Application – National ID
-3. Passport Issuance – Travel document
 
 Instructions:
 1. Classify the user query using one of these intents:
@@ -52,4 +49,4 @@ User Query: {query}
         return eval(response.json()["response"])
     except Exception as e:
         print("Router LLM error:", e)
-        return {"intent": "unknown", "name": "", "link": "#"}
+        return {"intent": "unknown", "name": ""}
